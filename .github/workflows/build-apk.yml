@@ -14,7 +14,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Extract Android project and fix Java target
+      - name: Extract project and configure Java 17
         run: |
           unzip -q AccessNfcLab-Phone-Build.zip -d extracted
           cd extracted/AccessNfcLab
@@ -22,13 +22,46 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          for name in ("build.gradle", "build.gradle.kts"):
-              p = Path("app") / name
-              if p.exists():
+          app = Path("app")
+
+          # Replace old Java 8 settings wherever they occur
+          for p in app.rglob("*"):
+              if p.is_file() and p.suffix in (".gradle", ".kts"):
                   s = p.read_text()
                   s = s.replace("JavaVersion.VERSION_1_8", "JavaVersion.VERSION_17")
+                  s = s.replace("VERSION_1_8", "VERSION_17")
                   p.write_text(s)
-                  print("Updated Java target in", p)
+
+          # Explicitly configure Java compilation
+          groovy = app / "build.gradle"
+          kotlin = app / "build.gradle.kts"
+
+          if groovy.exists():
+              with groovy.open("a") as f:
+                  f.write("""
+          
+          android {
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          """)
+          elif kotlin.exists():
+              with kotlin.open("a") as f:
+                  f.write("""
+          
+          android {
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+          }
+          """)
+          else:
+              raise SystemExit("App Gradle build file not found")
+
+          print("Java compatibility configured for version 17")
           PY
 
           echo "PROJECT_DIR=$PWD" >> "$GITHUB_ENV"
