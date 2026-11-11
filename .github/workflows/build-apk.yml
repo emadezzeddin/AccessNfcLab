@@ -1,8 +1,24 @@
+name: Build Access NFC Lab APK
 
-      - name: Extract Android project
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Extract Android project and fix Java target
         run: |
           unzip -q AccessNfcLab-Phone-Build.zip -d extracted
           cd extracted/AccessNfcLab
+
           python3 - <<'PY'
           from pathlib import Path
 
@@ -14,5 +30,29 @@
                   p.write_text(s)
                   print("Updated Java target in", p)
           PY
+
           echo "PROJECT_DIR=$PWD" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AccessNfcLab-debug-apk
+          path: extracted/AccessNfcLab/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           
